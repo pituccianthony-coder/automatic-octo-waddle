@@ -1,0 +1,35 @@
+# Core Bot & Async
+aiogram==3.21.0
+asyncio
+
+# Data & Analysis
+pandas
+numpy>=2.0.0
+vaderSentiment
+ta
+TA-Lib
+scikit-learn
+
+# Crypto & Finance
+ccxt
+
+# Database & Memory
+langchain
+langchain-community
+faiss-cpu
+sentence-transformers
+SQLAlchemy
+
+# Config & CLI
+python-dotenv
+pydantic
+pydantic-settings
+typer[all]
+
+# LLM Integration
+ollama
+
+# Testing
+pytest
+pytest-asyncio
+pytest-mock
