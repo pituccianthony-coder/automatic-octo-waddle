@@ -1,56 +1,117 @@
-# cli.py - Command-line interface for the Godfather Bot
+import asyncio
 import typer
-import os
-import subprocess
+from rich.console import Console
+from rich.table import Table
+from rich.json import JSON
 
-app = typer.Typer(help="Godfather Bot command-line utility.")
+from core import GodfatherCore
+from config import logger
 
-@app.command()
-def deploy(env: str = typer.Option("dev", "--env", "-e", help="Deployment environment ('dev' or 'prod').")):
-    """Deploys the application using Docker Compose (dev) or Kubernetes (prod)."""
-    if env.lower() == 'dev':
-        typer.echo("🚀 Deploying to development environment with Docker Compose...")
-        command = "docker-compose up -d --build"
-    elif env.lower() == 'prod':
-        typer.echo("🚀 Deploying to production environment with Kubernetes...")
-        # Assuming you have a k8s.yaml file for your production setup
-        command = "kubectl apply -f k8s.yaml"
+# --- Инициализация ---
+# Typer для создания красивого CLI, Rich для красивого вывода.
+# Боги предпочитают, чтобы их инструменты были не только мощными, но и элегантными.
+app = typer.Typer(
+    name="godfather-cli",
+    help="A master control panel for the Godfather Bot.",
+    add_completion=False
+)
+console = Console()
+core = GodfatherCore()
+
+async def run_async_command(command_coro):
+    """
+    Обёртка для запуска асинхронной команды и корректного завершения работы ядра.
+    """
+    try:
+        await command_coro
+    except Exception as e:
+        console.print(f"[bold red]An unexpected error occurred:[/bold red] {e}")
+    finally:
+        logger.info("CLI command finished, shutting down core.")
+        await core.shutdown()
+
+@app.command(name="analyze", help="Run a full analysis for a given trading symbol.")
+def analyze_symbol(
+    symbol: str = typer.Argument(..., help="The trading symbol to analyze, e.g., 'BTC/USDT'.")
+):
+    """Анализирует символ и выводит результат в консоль."""
+    console.print(f"[bold cyan]Analyzing {symbol}...[/bold cyan]")
+
+    async def main():
+        result = await core.process_symbol(symbol)
+        if "error" in result:
+            console.print(f"[bold red]Error:[/bold red] {result['error']}")
+            return
+
+        table = Table(title=f"Analysis for {result['symbol']}", show_header=False, box=None)
+        table.add_row("[bold]Final Signal[/bold]", f"[bold yellow]{result['signal']['signal']}[/bold yellow]")
+        table.add_row("Reason", result['signal']['reason'])
+        table.add_row()
+        table.add_row("[bold]Technicals[/bold]", result['technicals']['summary'])
+        table.add_row("Tech Details", result['technicals']['reason'])
+        table.add_row()
+        table.add_row("[bold]Sentiment[/bold]", f"{result['sentiment']['summary']} (Score: {result['sentiment']['score']:.2f})")
+
+        console.print(table)
+
+    asyncio.run(run_async_command(main()))
+
+
+@app.command(name="show-signals", help="Display the most recent recorded signals.")
+def show_signals(
+    limit: int = typer.Option(5, "--limit", "-l", help="Number of signals to display.")
+):
+    """Показывает последние сигналы из SQLite."""
+    console.print(f"[bold cyan]Fetching last {limit} signals...[/bold cyan]")
+
+    signals = core.memory.get_recent_signals(limit=limit)
+    if not signals:
+        console.print("[yellow]No signals found in memory.[/yellow]")
     else:
-        typer.echo(f"❌ Unknown environment: {env}")
-        raise typer.Exit(code=1)
-    
-    try:
-        subprocess.run(command, shell=True, check=True)
-        typer.echo(f"✅ Deployment to {env} initiated successfully.")
-    except subprocess.CalledProcessError as e:
-        typer.echo(f"❌ Deployment failed: {e}")
-        raise typer.Exit(code=1)
+        table = Table(title="Recent Trading Signals", box=None)
+        table.add_column("Timestamp", style="dim")
+        table.add_column("Symbol", style="cyan")
+        table.add_column("Signal", style="yellow")
+        table.add_column("Reason")
 
-@app.command()
-def train(symbol: str = typer.Argument(..., help="Crypto symbol to train the model on (e.g., BTCUSDT)."), 
-          epochs: int = typer.Option(5, "--epochs", help="Number of training epochs.")):
-    """Placeholder for training the ML models (LSTM, RandomForest)."""
-    # In a real implementation, this would trigger a training pipeline.
-    # For example, loading historical data, training models, and saving them.
-    typer.echo(f"🧠 Initiating training for symbol {symbol} for {epochs} epochs...")
-    typer.echo("This is a placeholder. Implement your training logic here.")
+        for s in signals:
+            table.add_row(
+                s['timestamp'].strftime('%Y-%m-%d %H:%M'),
+                s['symbol'],
+                s['signal_type'],
+                s['reason']
+            )
+        console.print(table)
 
-@app.command()
-def simulate(threshold: float = typer.Option(0.5, "--threshold", help="Signal threshold for the simulation.")):
-    """Runs a backtesting simulation based on historical data."""
-    # This would involve fetching historical data and running the `core` logic against it
-    # without sending live signals, to evaluate the strategy's performance.
-    typer.echo(f"📈 Running simulation with signal threshold: {threshold}...")
-    typer.echo("This is a placeholder. Implement your simulation logic here.")
+    # Завершаем работу ядра, так как оно было инициализировано
+    asyncio.run(run_async_command(asyncio.sleep(0))) # Просто для вызова shutdown
 
-@app.command()
-def logs(service: str = typer.Argument("bot", help="The service to view logs for (e.g., bot, celery, streamlit).")):
-    """Follows the logs of a specific service using docker-compose."""
-    typer.echo(f"FOLLOWING LOGS for service: {service}. Press Ctrl+C to exit.")
-    try:
-        subprocess.run(f"docker-compose logs -f {service}", shell=True)
-    except KeyboardInterrupt:
-        typer.echo("Stopped following logs.")
+@app.command(name="query-memory", help="Search the bot's vector memory (FAISS).")
+def query_memory(
+    query: str = typer.Argument(..., help="The text to search for in the bot's memory.")
+):
+    """Ищет релевантную информацию в векторной памяти."""
+    console.print(f"[bold cyan]Querying vector memory for: '{query}'...[/bold cyan]")
+
+    results = core.memory.search_memory(query, k=3)
+    if not results:
+        console.print("[yellow]No relevant memories found.[/yellow]")
+    else:
+        table = Table(title=f"Memory Search Results for '{query}'", box=None)
+        table.add_column("Score", style="magenta", justify="right")
+        table.add_column("Content")
+        table.add_column("Source", style="dim")
+
+        for res in results:
+            table.add_row(
+                f"{res['score']:.2f}",
+                res['content'],
+                res['metadata']['source']
+            )
+        console.print(table)
+
+    asyncio.run(run_async_command(asyncio.sleep(0)))
+
 
 if __name__ == "__main__":
     app()
