@@ -63,18 +63,16 @@ class MemoryManager:
             )
         else:
             logger.info("Creating new FAISS index.")
-            # Создаем пустой индекс с правильной размерностью
-            embedding_dimension = self.embedding_model.client.get_sentence_embedding_dimension()
-            # Индекс для быстрого поиска ближайших соседей
-            index = faiss.IndexFlatL2(embedding_dimension)
             # Пустой начальный документ, чтобы Langchain был счастлив
             dummy_texts = ["The Godfather Bot's memory begins."]
             dummy_metadatas = [{"source": "initialization"}]
+            # Упрощаем вызов. `from_texts` сам создаст нужный индекс.
+            # Предыдущая ошибка TypeError была из-за того, что мы передавали
+            # `index` в метод, который не ожидал его в этой версии langchain.
             return FAISS.from_texts(
                 dummy_texts,
                 self.embedding_model,
-                metadatas=dummy_metadatas,
-                index=index
+                metadatas=dummy_metadatas
             )
 
     def add_signal(self, symbol: str, signal_type: str, reason: str):

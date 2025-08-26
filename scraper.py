@@ -3,6 +3,7 @@ import ccxt.async_support as ccxt
 import httpx
 import feedparser
 from typing import List, Dict, Any, Optional
+from datetime import datetime, timedelta
 
 from config import settings, logger
 
@@ -38,27 +39,60 @@ class Scraper:
 
     async def get_binance_klines(self, symbol: str, timeframe: str = '1h', limit: int = 100) -> Optional[List[Dict[str, Any]]]:
         """
-        Получает исторические данные о свечах (OHLCV) с Binance.
+        Получает последние N свечей (OHLCV) с Binance.
         """
-        logger.info(f"Fetching {limit} klines for {symbol} with timeframe {timeframe} from Binance.")
+        logger.info(f"Fetching last {limit} klines for {symbol} with timeframe {timeframe} from Binance.")
+        if not self.binance.has['fetchOHLCV']:
+            logger.error("fetchOHLCV is not supported by the exchange.")
+            return None
         try:
-            # CCXT возвращает список списков, преобразуем его в более читаемый формат
             klines = await self.binance.fetch_ohlcv(symbol, timeframe, limit=limit)
-            structured_klines = [
-                {
-                    "timestamp": kline[0],
-                    "open": kline[1],
-                    "high": kline[2],
-                    "low": kline[3],
-                    "close": kline[4],
-                    "volume": kline[5]
-                }
-                for kline in klines
-            ]
-            return structured_klines
+            return self._structure_klines(klines)
         except Exception as e:
             logger.error(f"Error fetching klines for {symbol} from Binance: {e}")
             return None
+
+    async def get_historical_klines(self, symbol: str, days_ago: int, timeframe: str = '1h') -> Optional[List[Dict[str, Any]]]:
+        """
+        Получает исторические данные за определенный период в прошлом.
+        Это наша "машина времени" для бэктестинга.
+        """
+        logger.info(f"Fetching historical klines for {symbol} for the last {days_ago} days.")
+        if not self.binance.has['fetchOHLCV']:
+            return None
+
+        all_klines = []
+        # CCXT требует время в миллисекундах
+        since = self.binance.parse8601((datetime.utcnow() - timedelta(days=days_ago)).isoformat())
+
+        while True:
+            try:
+                klines = await self.binance.fetch_ohlcv(symbol, timeframe, since, limit=1000)
+                if not klines:
+                    break
+                all_klines.extend(klines)
+                since = klines[-1][0] + 1
+            except Exception as e:
+                logger.error(f"Error fetching historical batch for {symbol}: {e}")
+                # Возвращаем то, что успели собрать
+                break
+
+        logger.info(f"Fetched a total of {len(all_klines)} historical klines.")
+        return self._structure_klines(all_klines)
+
+    def _structure_klines(self, klines: List) -> List[Dict[str, Any]]:
+        """Вспомогательная функция для структурирования ответа от CCXT."""
+        return [
+            {
+                "timestamp": kline[0],
+                "open": kline[1],
+                "high": kline[2],
+                "low": kline[3],
+                "close": kline[4],
+                "volume": kline[5]
+            }
+            for kline in klines
+        ]
 
     async def get_google_news_rss(self, query: str, lang: str = 'en', country: str = 'US') -> Optional[List[Dict[str, str]]]:
         """
