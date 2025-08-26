@@ -3,28 +3,32 @@
 version: '3.8'
 
 services:
-  # Наш основной сервис, бэкенд EchoVoid.
-  # Мы называем его "oracle", потому что он будет предсказывать... или создавать... реальность.
   oracle:
-    # Собираем образ из нашего Dockerfile.
-    build: .
-    # Имя контейнера для удобства.
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: echovoid_oracle
-    # Пробрасываем порты, чтобы мы могли общаться с ним из нашего мира.
     ports:
       - "8000:8000"
-    # Монтируем код бэкенда в контейнер.
-    # Это позволяет нам изменять код на лету, и он будет меняться внутри контейнера.
-    # Божественный уровень "hot-reloading".
     volumes:
       - ./backend:/app
-    # Имя хоста внутри сети Docker.
-    hostname: oracle
-    # Перезапускаем его, если он вдруг умрет. Бессмертие — опция.
     restart: unless-stopped
+    networks:
+      - echovoid_net
 
-# Здесь в будущем появятся другие сервисы:
-# - Фронтенд на Next.js
-# - База данных (возможно, векторная)
-# - Локальный узел блокчейна для тестов
-# Но пока что достаточно одного оракула.
+  portal:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: echovoid_portal
+    ports:
+      - "3000:3000"
+    depends_on:
+      - oracle
+    restart: unless-stopped
+    networks:
+      - echovoid_net
+
+networks:
+  echovoid_net:
+    driver: bridge

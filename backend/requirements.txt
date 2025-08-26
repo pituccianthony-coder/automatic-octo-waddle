@@ -9,3 +9,6 @@ spacy
 
 # For numerical operations in matrix.py
 numpy
+
+# For blockchain interaction
+web3

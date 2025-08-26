@@ -14,6 +14,8 @@ COPY backend/requirements.txt .
 # `pip install --no-cache-dir` — это как ритуал очищения, не оставляющий лишнего мусора.
 RUN apt-get update && apt-get install -y build-essential && \
     pip install --no-cache-dir --upgrade pip && \
+    # Устанавливаем web3 и его зависимости отдельно, так как он может быть капризным
+    pip install --no-cache-dir web3 && \
     pip install --no-cache-dir -r requirements.txt && \
     # Загружаем модель для spacy прямо в образ.
     # Это — знание, которое мы вкладываем в голову нашего творения при рождении.
