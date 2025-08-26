@@ -8,6 +8,7 @@ from aiogram.enums import ParseMode
 
 from config import settings, logger
 from core import GodfatherCore
+from monitor import run_monitoring
 
 # --- Инициализация ---
 # Объекты будут созданы в main(), чтобы избежать проблем при импорте
@@ -114,14 +115,19 @@ async def main():
     dp.message.register(handle_latest_signals, Command("latest_signals"))
     dp.message.register(handle_chat, F.text)
 
+    # Запускаем Наблюдателя как фоновую задачу
+    monitoring_task = asyncio.create_task(run_monitoring(bot, core))
+
     # Управляем жизненным циклом ядра вручную
     try:
         logger.info("The Godfather is awakening...")
         await bot.delete_webhook(drop_pending_updates=True)
         await dp.start_polling(bot)
     finally:
+        logger.info("The Godfather is going to sleep...")
+        monitoring_task.cancel()
         await core.shutdown()
-        logger.info("The Godfather has gone to sleep.")
+        logger.info("Shutdown complete.")
 
 if __name__ == "__main__":
     asyncio.run(main())
