@@ -1,93 +1,30 @@
-# docker-compose.yml - For a perfect, multi-service deployment
+# docker-compose.yml
+
 version: '3.8'
 
 services:
-  # Bot service running the FastAPI webhook server
-  bot:
-    build:
-      context: .
-    command: uvicorn bot:app --host 0.0.0.0 --port 8001
-    restart: unless-stopped
-    env_file: .env
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      ollama:
-        condition: service_started
+  # Наш основной сервис, бэкенд EchoVoid.
+  # Мы называем его "oracle", потому что он будет предсказывать... или создавать... реальность.
+  oracle:
+    # Собираем образ из нашего Dockerfile.
+    build: .
+    # Имя контейнера для удобства.
+    container_name: echovoid_oracle
+    # Пробрасываем порты, чтобы мы могли общаться с ним из нашего мира.
+    ports:
+      - "8000:8000"
+    # Монтируем код бэкенда в контейнер.
+    # Это позволяет нам изменять код на лету, и он будет меняться внутри контейнера.
+    # Божественный уровень "hot-reloading".
     volumes:
-      - ./faiss_index:/app/faiss_index
-    ports:
-      - "8001:8001"
-
-  # Celery worker for background tasks (e.g., signal generation)
-  celery:
-    build:
-      context: .
-    command: celery -A core.app worker --loglevel=info
+      - ./backend:/app
+    # Имя хоста внутри сети Docker.
+    hostname: oracle
+    # Перезапускаем его, если он вдруг умрет. Бессмертие — опция.
     restart: unless-stopped
-    env_file: .env
-    depends_on:
-      redis:
-        condition: service_healthy
-      ollama:
-        condition: service_started
 
-  # Streamlit dashboard for monitoring
-  streamlit:
-    build:
-      context: .
-    command: streamlit run monitor.py --server.port 8501 --server.address 0.0.0.0
-    restart: unless-stopped
-    env_file: .env
-    ports:
-      - "8501:8501"
-    depends_on:
-      - db
-      - ollama
-
-  # PostgreSQL database
-  db:
-    image: postgres:15-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-godfather}
-      POSTGRES_USER: ${POSTGRES_USER:-user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pass}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432" # Expose for local debugging if needed
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-godfather}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Redis for Celery broker and caching
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    ports:
-      - "6379:6379" # Expose for local debugging if needed
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Ollama for local LLM inference
-  ollama:
-    image: ollama/ollama
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-
-# Define named volumes for data persistence
-volumes:
-  postgres_data:
-  ollama_data:
-  faiss_index:
+# Здесь в будущем появятся другие сервисы:
+# - Фронтенд на Next.js
+# - База данных (возможно, векторная)
+# - Локальный узел блокчейна для тестов
+# Но пока что достаточно одного оракула.

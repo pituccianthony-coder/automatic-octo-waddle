@@ -1,0 +1,11 @@
+# FastAPI and its server
+fastapi
+uvicorn[standard]
+
+# For NLP in poet.py
+spacy
+# We'll need the english model for spacy
+# python -m spacy download en_core_web_sm
+
+# For numerical operations in matrix.py
+numpy

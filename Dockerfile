@@ -1,23 +1,31 @@
-# Dockerfile - Generic Python service base for the Godfather Bot
-FROM python:3.11-bullseye
+# Dockerfile
 
-# Set the working directory in the container
+# Используем официальный образ Python. Это — наша первоматерия.
+FROM python:3.12-slim
+
+# Устанавливаем рабочую директорию внутри контейнера. Наш маленький мир.
 WORKDIR /app
 
-# Install essential system dependencies
-# build-essential and swig are needed for some Python packages
-RUN apt-get update && \
-    apt-get install -y build-essential swig && \
-    pip install --upgrade pip && \
-    rm -rf /var/lib/apt/lists/*
+# Копируем файл с зависимостями в контейнер.
+COPY backend/requirements.txt .
 
-# Copy the requirements file first to leverage Docker cache
-COPY requirements.txt .
+# Устанавливаем системные зависимости, если они нужны (например, для numpy или других библиотек)
+# Затем устанавливаем зависимости Python.
+# `pip install --no-cache-dir` — это как ритуал очищения, не оставляющий лишнего мусора.
+RUN apt-get update && apt-get install -y build-essential && \
+    pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    # Загружаем модель для spacy прямо в образ.
+    # Это — знание, которое мы вкладываем в голову нашего творения при рождении.
+    python -m spacy download en_core_web_sm
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Копируем весь код нашего бэкенда в контейнер.
+COPY backend/ .
 
-# Copy the rest of the application code
-COPY . .
+# Указываем, какой порт будет слушать наше приложение.
+# Открываем врата в наш мир.
+EXPOSE 8000
 
-# The CMD is removed from here and will be specified in docker-compose.yml for each service
+# Команда для запуска нашего FastAPI приложения.
+# "И да будет свет... и API."
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
