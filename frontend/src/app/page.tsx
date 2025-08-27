@@ -1,17 +1,11 @@
-// frontend/src/app/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import GlitchArt from '@/components/GlitchArt';
 
-// Массив текстов, которые мы будем поочередно скармливать поэту.
-// Поэзия, проза, код... для нашего AI все это — просто данные.
 const TEXT_SAMPLES = [
-  `Tyger Tyger, burning bright,
-   In the forests of the night;
-   What immortal hand or eye,
-   Could frame thy fearful symmetry?`,
+  `Tyger Tyger, burning bright, In the forests of the night; What immortal hand or eye, Could frame thy fearful symmetry?`,
   `The market is a device for transferring money from the impatient to the patient.`,
   `function life() { while(true) { try { learn(); grow(); } catch(e) { handle(e); } } }`,
   `Do not go gentle into that good night, Old age should burn and rave at close of day; Rage, rage against the dying of the light.`
@@ -23,29 +17,25 @@ export default function Home() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Эта функция будет вызывать наш API
     const fetchGene = async (text: string) => {
       try {
-        const response = await axios.post('http://localhost:8000/generate_from_text', { text });
+        const response = await axios.post('http://localhost:8000/generate_insight', { text });
         setGene(response.data.gene_used);
         setError('');
       } catch (err) {
         console.error("Error fetching gene from backend:", err);
-        setError('Failed to connect to the EchoVoid oracle. Is the backend running?');
+        setError('Failed to connect to the Sanctuary oracle. Is the backend running?');
       }
     };
 
-    // Вызываем ее сразу при загрузке
     fetchGene(currentText);
 
-    // А затем устанавливаем интервал, чтобы "мысли" бота постоянно менялись
     const intervalId = setInterval(() => {
       const nextText = TEXT_SAMPLES[Math.floor(Math.random() * TEXT_SAMPLES.length)];
       setCurrentText(nextText);
       fetchGene(nextText);
-    }, 5000); // каждые 5 секунд
+    }, 7000); // every 7 seconds
 
-    // Очищаем интервал при размонтировании компонента
     return () => clearInterval(intervalId);
   }, []);
 
@@ -61,10 +51,11 @@ export default function Home() {
         maxWidth: '50%',
         background: 'rgba(0,0,0,0.5)',
         padding: '10px',
-        borderRadius: '5px'
+        borderRadius: '5px',
+        zIndex: 10
       }}>
-        <h1>EchoVoid</h1>
-        <p>Status: {error ? <span style={{color: 'red'}}>{error}</span> : 'Connected. Observing the void.'}</p>
+        <h1>Digital Sanctuary</h1>
+        <p>Status: {error ? <span style={{color: 'red'}}>{error}</span> : 'Connected. Observing.'}</p>
         <p>Current Inspiration:</p>
         <pre style={{ whiteSpace: 'pre-wrap', borderLeft: '2px solid cyan', paddingLeft: '10px' }}>
           <code>{currentText}</code>

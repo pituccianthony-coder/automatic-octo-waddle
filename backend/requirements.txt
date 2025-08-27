@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+spacy
+numpy>=2.0.0
+# Зависимости для тестирования
+pytest
+pytest-asyncio
+httpx # Для TestClient в FastAPI
